@@ -1,3 +1,4 @@
+import pathlib
 from PyQt5.QtGui import QPalette, QKeySequence, QIcon
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QDir, Qt, QUrl, QSize, QPoint, QTime
@@ -6,8 +7,8 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLineEdit,
                             QPushButton, QSizePolicy, QSlider, QMessageBox, QStyle, QVBoxLayout,  
                             QWidget, QShortcut, QFormLayout, QDialog)
-import os
 import re
+import os
 try:
     import subprocess
     from subprocess import run
@@ -19,6 +20,7 @@ try:
 except:
     pass
 from builtins import str
+
 
 class VideoPlayer(QWidget):
 
@@ -81,7 +83,7 @@ class VideoPlayer(QWidget):
         self.positionSlider.setStyleSheet(stylesheet(self))
         self.positionSlider.setRange(0,100)
         self.positionSlider.sliderMoved.connect(self.setPosition)
-        self.positionSlider.sliderMoved.connect(self.handleLabel)
+        self.positionSlider.sliderMoved.connect(self.handle_label)
         self.positionSlider.setSingleStep(2)
         self.positionSlider.setPageStep(20)
         #self.positionSlider.setAttribute(Qt.WA_NoSystemBackground, True)
@@ -144,22 +146,22 @@ class VideoPlayer(QWidget):
         self.mediaPlayer.setVideoOutput(self.videoWidget)
         self.mediaPlayer.stateChanged.connect(self.mediaStateChanged)
         self.mediaPlayer.positionChanged.connect(self.positionChanged)
-        self.mediaPlayer.positionChanged.connect(self.handleLabel)
+        self.mediaPlayer.positionChanged.connect(self.handle_label)
         self.mediaPlayer.durationChanged.connect(self.durationChanged)
         self.mediaPlayer.error.connect(self.handleError)
         
         self.apoint = 0
         self.bpoint = 0
-        self.inputfile = 0
-        self.outputfile = 0
+        self.inputfile = pathlib.Path()
+        # self.outputfile = pathlib.Path()
     
     def openFile(self):
         fileName, _ = QFileDialog.getOpenFileName(self, 'Open Movie', QDir.homePath()+'/Desktop', 'Videos (*.mp4 *.ts *.avi *.mpeg *.mpg *.mkv *.VOB *.m4v)')
         if fileName != '':
-            self.loadFilm(fileName)
+            self.load_film(fileName)
             print("File loaded")
             print(fileName)
-            self.inputfile = fileName
+            self.inputfile = pathlib.Path(fileName)
 
     
     def getclipFileName(self):
@@ -192,32 +194,28 @@ class VideoPlayer(QWidget):
     def setPosition(self, position):
         self.mediaPlayer.setPosition(position)
         
-    ### cut point A function
+    # cut point A function
     def setPointA(self):
         self.apoint = self.time.toString()
         print('A Point ' + self.apoint)
         
-    ### cut point B function
+    # cut point B function
     def setPointB(self):
         self.play()
         self.bpoint = self.time.toString()
         print('B Point ' + self.bpoint)
         
-    ### cut
+    # cut
     def cut(self):
-        #self.outputfile = self.getclipFileName()[0]
-        print(self.inputfile)
-        print(self.outputfile)
+        print("Input: ", self.inputfile.resolve())
         length = self.lengthCalculation(self.apoint, self.bpoint)
-        inputfile0 = re.sub(' ','\ ',self.inputfile)
-        outputfile0 = inputfile0[:-4]+'__'+self.apoint+'__'+self.bpoint+inputfile0[-4:]
-        outputfile0 = re.sub(':','_',outputfile0)
-        self.outputfile =outputfile0
-        command = "ffmpeg -n -ss "+self.apoint+" -i "+inputfile0+" -c copy -t "+length+" "+self.outputfile
-        print(command)
+        output_file = os.path.splitext(str(self.inputfile.resolve()))[0]+'__'+re.sub(':','_',self.apoint)+'__'+re.sub(':','_',self.bpoint)+self.inputfile.suffix  # no ':' allowed in a windows path.
+        print("Output:", output_file)
+        command = "ffmpeg -i "+"\""+str(self.inputfile.resolve())+"\""+" -ss "+self.apoint+" -t "+length+" -c:v copy -c:a copy "+"\""+output_file+"\""
+        print("Executing:\n", command, "\n")
         run(command, shell=True)
-    
-    ### cut length calculation
+
+    # cut length calculation
     def twodigi(self,str0):
         if len(str0) == 1:
             str0 = '0'+str0
@@ -225,11 +223,11 @@ class VideoPlayer(QWidget):
     
     def lengthCalculation(self, start, end):
         start_s = int(start[:2])*3600+int(start[3:5])*60+int(start[6:])
-        print(start_s)
+        # print(start_s)
         end_s = int(end[:2])*3600+int(end[3:5])*60+int(end[6:])
-        print(end_s)
+        # print(end_s)
         length_s = end_s - start_s
-        print(length_s)
+        # print(length_s)
         hr = self.twodigi(str(length_s//3600))
         mn = self.twodigi(str((length_s%3600)//60))
         sc = self.twodigi(str(length_s%60))
@@ -316,7 +314,6 @@ class VideoPlayer(QWidget):
         self.positionSlider.hide()
         self.elbl.hide()
         mwidth = self.frameGeometry().width()
-        #mheight = self.frameGeometry().height()
         mleft = self.frameGeometry().left()
         mtop = self.frameGeometry().top()
         if self.widescreen == True:
@@ -330,7 +327,6 @@ class VideoPlayer(QWidget):
         self.positionSlider.show()
         self.elbl.show()
         mwidth = self.frameGeometry().width()
-        #mheight = self.frameGeometry().height()
         mleft = self.frameGeometry().left()
         mtop = self.frameGeometry().top()
         self.positionSlider.setFocus()
@@ -374,33 +370,33 @@ class VideoPlayer(QWidget):
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
             f = str(event.mimeData().urls()[0].toLocalFile())
-            self.loadFilm(f)
-            self.inputfile = f
+            self.load_film(f)
+            self.inputfile = pathlib.Path(f)
         elif event.mimeData().hasText():
             f = str(event.mimeData().text())
             self.mediaPlayer.setMedia(QMediaContent(QUrl(f)))
-            self.inputfile = f
+            self.inputfile = pathlib.Path(f)
             self.mediaPlayer.play() 
     
-    def loadFilm(self, f):
+    def load_film(self, f):
         self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(f)))
         self.playButton.setEnabled(True)
         self.apointButton.setEnabled(True)
         self.bpointButton.setEnabled(True)
         self.cutButton.setEnabled(True)
         self.mediaPlayer.play()
-        #print(str(self.mediaPlayer.media().canonicalResource().resolution()))
-    
-    def openFileAtStart(self, filelist):
+
+    def open_file_at_start(self, filelist):
         matching = [s for s in filelist if '.myformat'  in s]
         if len(matching) > 0:
-            self.loadFilm(matching)
+            self.load_film(matching)
     
-    def handleLabel(self):
+    def handle_label(self):
         self.lbl.clear()
         mtime = QTime(0,0,0,0)
         self.time = mtime.addMSecs(self.mediaPlayer.position())
         self.lbl.setText(self.time.toString())
+
 
 def stylesheet(self):
     return """
@@ -426,14 +422,14 @@ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
     """
 
+
 if __name__ == '__main__':
-    
     import sys
     app = QApplication(sys.argv)
     player = VideoPlayer('')
     if len(sys.argv) > 1:
         print(sys.argv[1])
-        player.loadFilm(sys.argv[1])
+        player.load_film(sys.argv[1])
     player.resize(720,480)
         
 sys.exit(app.exec_())
